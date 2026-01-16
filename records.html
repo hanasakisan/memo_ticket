@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记账记录 - 智能记账本</title>
+    <!-- 替换为BootCDN的Font Awesome -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --color-primary: #4F46E5;
+            --color-income: #10B981;
+            --color-expense: #EF4444;
+        }
+        .card-shadow {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="index.html" class="flex items-center text-gray-800">
+                <i class="fa fa-arrow-left mr-2"></i>
+                <span>返回首页</span>
+            </a>
+            <h1 class="text-lg font-bold text-gray-800">记账记录</h1>
+            <button id="syncBtn" class="px-3 py-1.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-lg flex items-center hover:bg-[var(--color-primary)]/20 transition">
+                <i class="fa fa-cloud-upload mr-1.5"></i>
+                <span>同步数据</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6 max-w-3xl">
+        <!-- 统计概览 -->
+        <section class="mb-6">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-[var(--color-income)] text-center">
+                    <p class="text-xs text-gray-500 mb-1">总收入</p>
+                    <p id="totalIncome" class="text-lg font-bold text-[var(--color-income)]">¥0.00</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-[var(--color-expense)] text-center">
+                    <p class="text-xs text-gray-500 mb-1">总支出</p>
+                    <p id="totalExpense" class="text-lg font-bold text-[var(--color-expense)]">¥0.00</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-[var(--color-primary)] text-center">
+                    <p class="text-xs text-gray-500 mb-1">余额</p>
+                    <p id="balance" class="text-lg font-bold text-[var(--color-primary)]">¥0.00</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 筛选区域 -->
+        <section class="mb-6 bg-white rounded-xl p-4 card-shadow">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div class="flex gap-2">
+                    <button id="filterAll" class="px-3 py-1 rounded-lg bg-[var(--color-primary)] text-white text-sm">全部</button>
+                    <button id="filterIncome" class="px-3 py-1 rounded-lg bg-gray-200 text-gray-700 text-sm">收入</button>
+                    <button id="filterExpense" class="px-3 py-1 rounded-lg bg-gray-200 text-gray-700 text-sm">支出</button>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <input type="date" id="startDate" class="px-2 py-1 border border-gray-300 rounded-lg text-sm">
+                    <span>-</span>
+                    <input type="date" id="endDate" class="px-2 py-1 border border-gray-300 rounded-lg text-sm">
+                    <button id="queryByDate" class="px-2 py-1 bg-[var(--color-primary)] text-white rounded-lg text-sm">查询</button>
+                    <button id="resetDate" class="px-2 py-1 bg-gray-200 text-gray-700 rounded-lg text-sm">重置</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 记录列表 -->
+        <section>
+            <!-- 空状态 -->
+            <div id="emptyState" class="py-16 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                    <i class="fa fa-file-text-o text-gray-400 text-2xl"></i>
+                </div>
+                <p class="text-gray-500">暂无记账记录，前往新增记账吧！</p>
+                <a href="add-record.html" class="mt-4 inline-block px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg">
+                    <i class="fa fa-plus mr-1"></i> 新增记录
+                </a>
+            </div>
+            
+            <!-- 记录列表容器 -->
+            <div id="recordsList" class="space-y-3 hidden">
+            </div>
+        </section>
+    </main>
+
+    <!-- 提示框容器 -->
+    <div id="toast" class="fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50"></div>
+
+    <script src="utils.js"></script>
+    <script>
+        // 全局筛选变量
+        let currentFilter = 'all';
+        let startDate = '';
+        let endDate = '';
+        let records = [];
+        
+        // DOM加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取本地记录
+            records = getRecords();
+            // 绑定所有事件
+            bindFilterEvents();
+            // 渲染记录列表
+            renderRecords();
+            // 更新统计数据
+            updateStats();
+            
+            console.log('记录页面初始化完成，共加载', records.length, '条记录'); // 调试用，可删除
+        });
+        
+        // 绑定筛选相关事件
+        function bindFilterEvents() {
+            // 1. 收支类型筛选事件
+            document.getElementById('filterAll').addEventListener('click', () => setFilter('all'));
+            document.getElementById('filterIncome').addEventListener('click', () => setFilter('income'));
+            document.getElementById('filterExpense').addEventListener('click', () => setFilter('expense'));
+            
+            // 2. 时间筛选 - 查询按钮
+            document.getElementById('queryByDate').addEventListener('click', function() {
+                startDate = document.getElementById('startDate').value;
+                endDate = document.getElementById('endDate').value;
+                renderRecords();
+                showToast(document, '时间筛选已生效', 'info');
+            });
+            
+            // 3. 时间筛选 - 重置按钮
+            document.getElementById('resetDate').addEventListener('click', function() {
+                document.getElementById('startDate').value = '';
+                document.getElementById('endDate').value = '';
+                startDate = '';
+                endDate = '';
+                renderRecords();
+                showToast(document, '时间筛选已重置', 'info');
+            });
+            
+            // 4. 同步数据按钮
+            document.getElementById('syncBtn').addEventListener('click', function() {
+                syncToCloud(document, records);
+            });
+        }
+
+        // 设置收支类型筛选
+        function setFilter(filter) {
+            currentFilter = filter;
+            
+            // 更新筛选按钮样式
+            document.getElementById('filterAll').className = filter === 'all' 
+                ? 'px-3 py-1 rounded-lg bg-[var(--color-primary)] text-white text-sm' 
+                : 'px-3 py-1 rounded-lg bg-gray-200 text-gray-700 text-sm';
+                
+            document.getElementById('filterIncome').className = filter === 'income' 
+                ? 'px-3 py-1 rounded-lg bg-[var(--color-income)] text-white text-sm' 
+                : 'px-3 py-1 rounded-lg bg-gray-200 text-gray-700 text-sm';
+                
+            document.getElementById('filterExpense').className = filter === 'expense' 
+                ? 'px-3 py-1 rounded-lg bg-[var(--color-expense)] text-white text-sm' 
+                : 'px-3 py-1 rounded-lg bg-gray-200 text-gray-700 text-sm';
+            
+            // 重新渲染列表
+            renderRecords();
+        }
+
+        // 渲染记录列表
+        function renderRecords() {
+            const recordsList = document.getElementById('recordsList');
+            const emptyState = document.getElementById('emptyState');
+            
+            // 复制原始记录，避免修改源数据
+            let filteredRecords = [...records];
+            
+            // 第一步：收支类型筛选
+            if (currentFilter === 'income') {
+                filteredRecords = filteredRecords.filter(r => r.type === 'income');
+            } else if (currentFilter === 'expense') {
+                filteredRecords = filteredRecords.filter(r => r.type === 'expense');
+            }
+            
+            // 第二步：时间范围筛选（仅当起止日期都填写时生效）
+            if (startDate && endDate) {
+                filteredRecords = filteredRecords.filter(r => {
+                    const recordDate = new Date(r.date);
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+                    // 设置结束日期的时间为23:59:59，确保包含当天所有记录
+                    end.setHours(23, 59, 59, 999);
+                    return recordDate >= start && recordDate <= end;
+                });
+            }
+            
+            // 显示/隐藏空状态
+            if (filteredRecords.length === 0) {
+                recordsList.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            // 隐藏空状态，显示记录列表
+            emptyState.classList.add('hidden');
+            recordsList.classList.remove('hidden');
+            
+            // 清空现有列表
+            recordsList.innerHTML = '';
+            
+            // 渲染每条记录
+            filteredRecords.forEach(record => {
+                const isIncome = record.type === 'income';
+                const categoryName = getCategoryName(record.category);
+                const amountText = isIncome ? '+' + record.amount.toFixed(2) : '-' + record.amount.toFixed(2);
+                const amountColor = isIncome ? 'text-[var(--color-income)]' : 'text-[var(--color-expense)]';
+                
+                // 创建记录项DOM
+                const recordItem = document.createElement('div');
+                recordItem.className = 'bg-white rounded-lg p-4 card-shadow hover:shadow-md transition';
+                recordItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center mb-1">
+                                <span class="text-sm font-medium ${amountColor}">¥${amountText}</span>
+                                <span class="ml-2 px-2 py-0.5 bg-gray-100 text-xs rounded text-gray-600">
+                                    ${categoryName}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-500 mb-2">${record.notes || '无备注'}</p>
+                            <div class="flex items-center text-xs text-gray-400">
+                                <i class="fa fa-calendar-o mr-1"></i>
+                                ${formatDate(record.date)}
+                            </div>
+                        </div>
+                        <button class="delete-btn text-gray-400 hover:text-[var(--color-expense)] p-1" data-id="${record.id}">
+                            <i class="fa fa-trash-o"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // 添加删除事件
+                recordItem.querySelector('.delete-btn').addEventListener('click', function() {
+                    deleteRecord(record.id);
+                });
+                
+                // 添加到列表
+                recordsList.appendChild(recordItem);
+            });
+        }
+
+        // 更新统计数据
+        function updateStats() {
+            const stats = calculateStats(records);
+            document.getElementById('totalIncome').textContent = `¥${stats.totalIncome.toFixed(2)}`;
+            document.getElementById('totalExpense').textContent = `¥${stats.totalExpense.toFixed(2)}`;
+            document.getElementById('balance').textContent = `¥${stats.balance.toFixed(2)}`;
+        }
+
+        // 删除记录
+        function deleteRecord(id) {
+            if (confirm('确定要删除这条记账记录吗？删除后无法恢复！')) {
+                // 过滤掉要删除的记录
+                records = records.filter(record => record.id !== id);
+                // 保存到本地存储
+                saveRecords(records);
+                // 重新渲染列表和统计数据
+                renderRecords();
+                updateStats();
+                // 提示删除成功
+                showToast(document, '记录已成功删除', 'success');
+            }
+        }
+    </script>
+</body>
+</html>
