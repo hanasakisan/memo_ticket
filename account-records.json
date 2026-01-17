@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1768619326068,
+    "type": "expense",
+    "amount": 22,
+    "category": "food",
+    "date": "2025-12-07",
+    "notes": "双桥牛肉米线",
+    "createdAt": "2026-01-17T03:08:46.068Z"
+  },
+  {
+    "id": 1768618304068,
+    "type": "expense",
+    "amount": 3,
+    "category": "transportation",
+    "date": "2025-12-05",
+    "notes": "吾悦广场停车费",
+    "createdAt": "2026-01-17T02:51:44.068Z"
+  },
+  {
+    "id": 1768618281774,
+    "type": "expense",
+    "amount": 13.83,
+    "category": "shopping",
+    "date": "2025-12-05",
+    "notes": "水果店买水果",
+    "createdAt": "2026-01-17T02:51:21.774Z"
+  },
+  {
+    "id": 1768618243103,
+    "type": "expense",
+    "amount": 33.7,
+    "category": "shopping",
+    "date": "2025-12-05",
+    "notes": "大尔多超市采购",
+    "createdAt": "2026-01-17T02:50:43.103Z"
+  },
+  {
+    "id": 1768618160787,
+    "type": "expense",
+    "amount": 32,
+    "category": "food",
+    "date": "2025-12-05",
+    "notes": "老伙子火锅加菜",
+    "createdAt": "2026-01-17T02:49:20.787Z"
+  }
+]
